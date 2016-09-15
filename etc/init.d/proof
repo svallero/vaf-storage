@@ -1,0 +1,316 @@
+#!/bin/bash
+#
+# /etc/init.d/xproofd - Start/stop PROOF
+#
+# The following two lines allow this script to be managed by Fedora's
+# chkconfig program.
+#
+# chkconfig: - 80 30
+# description: PROOF is the Parallel ROOT Facility.
+
+export COMMAND="$1"
+
+# Source AF environment
+source /etc/aafrc || exit 1
+
+# Set up environment for ROOT version used for PROOF
+export ROOTSYS="$AF_ROOT_PROOF"
+
+# Get Xrootd libraries from inside AliEn
+export XRDAPI="$AF_ALIEN_DIR/api"
+
+# PROOF workdir
+export XPREF="$AF_PREFIX"/var/proof
+
+# General exports for AAF compatibility
+#export ALICE_PROOF_AAF_PROOF_DIR="$XPREF"
+#export ALICE_PROOF_AAF_XROOTD_REDIRECTOR="$(hostname -f)"
+#export ALICE_PROOF_AAF_ALIEN_PACKAGES="$AF_PACK_DIR"
+
+# Guess binary for xproofd
+export XPDBIN="$ROOTSYS"/bin/xproofd
+
+# After this timeout (in seconds), send SIGKILL
+export STOPTIMEOUT=10
+
+# PROOF configuration
+export XCONF="$AF_PREFIX/etc/proof/prf-main.cf"
+
+# PROOF log file
+export XLOG="$AF_PREFIX/var/log/proof.log"
+
+# PROOF working directory
+export XPREF="$AF_PREFIX/var/proof"
+
+# Libraries and paths
+export LD_LIBRARY_PATH="$ROOTSYS/lib:$XRDAPI/lib:$LD_LIBRARY_PATH"
+export PATH="$ROOTSYS/bin:$XRDAPI/bin:$PATH"
+
+# Lock file
+export LockSubsys='/var/lock/subsys/proof'
+
+# cron.d check file
+export CrondRestart='/etc/cron.d/proof-resuscitate'
+
+# Maximum number of opened files for group AF_USERS_GROUP
+export ProofMaxFiles=65500
+
+# Limits file: *must* end with .conf!
+export ProofUlimit='/etc/security/limits.d/proof.conf'
+
+# No binary, no party
+if [ ! -e "$XPDBIN" ]; then
+  echo "Can't guess xproofd path, aborting"
+  exit 22
+fi
+
+if [ `whoami` != "root" ]; then
+  echo "You must be root to run this script, aborting"
+  exit 42
+fi
+
+# Gets xproofd pid (or nothing)
+function xpdpid() {
+  ps -e -o pid,command | grep "$XCONF" | grep "$XLOG" | \
+    grep -v grep | awk '{print $1}'
+}
+
+# Creates skeleton for PROOF
+function xpdskel() {
+
+  # PROOF working directory
+  mkdir -p "$XPREF" 2> /dev/null
+  if [ $? != 0 ]; then
+    echo "Can't create working directory $XPREF"
+    return 1
+  fi
+  chown $AF_USER:$AF_GROUP "$XPREF"
+  chmod 0755 "$XPREF"
+
+  # Log directory
+  local XLOGDIR=$(dirname "$XLOG")
+  mkdir -p "$XLOGDIR" 2> /dev/null
+  if [ $? != 0 ]; then
+    echo "Can't create log directory $XLOGDIR"
+    return 1
+  fi
+  chown -R $AF_USER:$AF_GROUP "$XLOGDIR"
+  chmod 1775 "$XLOGDIR"
+
+  # Sockets (admin) directory
+  local XADM="$XPREF/admin"
+  mkdir -p "$XADM" 2> /dev/null
+  if [ $? != 0 ]; then
+    echo "Can't create admin directory $XADM"
+    return 1
+  fi
+  chown root:root "$XADM"
+  chmod 1777 "$XADM"
+
+  # Datasets directory
+  mkdir -p "$AF_DATASETS" 2> /dev/null
+  if [ $? != 0 ]; then
+    echo "Can't create datasets directory $AF_DATASETS"
+    return 1
+  fi
+  chown $AF_USER:$AF_GROUP "$AF_DATASETS"
+
+  # The "proofbox" directory (under the working directory)
+  local XWD="$XPREF/proofbox"
+  mkdir -p "$XWD" 2> /dev/null
+  if [ $? != 0 ]; then
+    echo "Can't create working directory $XWD"
+    return 1
+  fi
+  chown root:root "$XWD"
+  chmod 0755 "$XWD"
+
+  # Global packages directory
+  local XPKG="$XPREF/proofbox/$AF_USER/packages"
+  mkdir -p "$XPKG" 2> /dev/null
+  if [ $? != 0 ]; then
+    echo "Can't create global packages directory $XPKG"
+    return 1
+  fi
+  chown -R $AF_USER:$AF_GROUP "$XPKG"
+  chmod -R 0755 "$XPKG"
+
+  # PROOF directory to export via internal xrootd
+  mkdir -p "$AF_PROOF_EXPORT" 2> /dev/null
+  if [ $? != 0 ]; then
+    echo "Can't create PROOF exported directory $AF_PROOF_EXPORT"
+    return 1
+  fi
+  chown -R $AF_USER:$AF_GROUP "$AF_PROOF_EXPORT"
+  chmod -R 0755 "$AF_PROOF_EXPORT"
+
+}
+
+# Kills stale PROOF workers
+function xpdkillwrk() {
+  killall -KILL proofserv.exe > /dev/null 2>&1
+}
+
+# Prints xproofd status (running or not)
+function xpdstatus() {
+  local PID=$(xpdpid)
+  if [ "$PID" != "" ]; then
+    echo "PROOF (xproofd) is running with PID $PID"
+    return 0
+  elif [ -e $LockSubsys ]; then
+    echo "PROOF (xproofd) is not running, but lockfile present (crashed?)"
+    return 2
+  else
+    echo "PROOF (xproofd) is not running"
+    return 1
+  fi
+}
+
+# Start xproofd (if not started yet)
+function xpdstart() {
+
+  local PID=$(xpdpid)
+  if [ "$PID" == "" ]; then
+
+    # Creates directory skeleton
+    xpdskel
+    if [ $? != 0 ]; then
+      echo "Can't prepare xproofd startup"
+      return 1
+    fi
+
+    # Kills all the stale PROOF workers
+    xpdkillwrk
+
+    # Add MonALISA monitoring in cron.d
+    cat "$AF_PREFIX"/etc/af-monalisa.cron > /etc/cron.d/af-monalisa
+
+    # Sets ulimits for PROOF
+    echo "* - nofile $ProofMaxFiles" > $ProofUlimit
+    #echo "@$AF_USERS_GROUP soft nofile $ProofMaxFiles" >  $ProofUlimit
+    #echo "@$AF_USERS_GROUP hard nofile $ProofMaxFiles" >> $ProofUlimit
+
+    echo 'Starting PROOF (xproofd), hang on...'
+    "$XPDBIN" -b -c "$XCONF" -l "$XLOG" -R $AF_USER
+
+    sleep 2
+    PID=$(xpdpid)
+    if [ "$PID" == "" ]; then
+      echo "Starting of xproofd failed"
+      return 1
+    else
+      echo "xproofd started with PID $PID"
+      # Create machinery to automatically bring PROOF up if it crashed
+      touch $LockSubsys
+      echo '* * * * * root /sbin/service proof restart-if-down' \
+        '> /dev/null 2> /dev/null' > $CrondRestart
+    fi
+  else
+    echo "Not starting: xproofd already running with PID $PID"
+  fi
+  return 0
+}
+
+# Stop xproofd (DON'T EVER USE Stopxpd!!!)
+function xpdstop() {
+  local PID=$(xpdpid)
+  local TERMINATED=0
+  local I
+
+  # Check if PROOF is running
+  if [ "$PID" == "" ]; then
+    if [ -e $LockSubsys ]; then
+      echo "Not stopping: xproofd not running, but abnormally terminated"
+    else
+      echo "Not stopping: xproofd not running"
+    fi
+  else
+    echo -n "Stopping xproofd (wait max ${STOPTIMEOUT}s)..."
+    kill -15 $PID
+    for ((I=0; $I<$STOPTIMEOUT; I++)); do
+      kill -0 $PID 2> /dev/null
+      if [ $? != 0 ]; then
+        TERMINATED=1
+        echo "gently stopped"
+        break
+      else
+        echo -n "."
+        sleep 1
+      fi
+    done
+    if [ $TERMINATED == 0 ]; then
+      kill -9 $PID 2> /dev/null
+      echo "forced termination"
+    fi
+    rm -f $LockSubsys
+    rm -f $CrondRestart
+  fi
+
+  # Kills proofserv.exe
+  echo -n "Purging stale PROOF workers..."
+  xpdkillwrk
+  echo "done"
+
+  return 0
+}
+
+# Resuscitates xproofd if it crashed. If abnormally terminated the /var/lock/
+# subsys/proof file exists, but the daemon is not running. Function normally
+# invoked by crond
+function xpdresuscitate() {
+  local Ret
+  if [ -e $LockSubsys ]; then
+    echo "Lockfile $LockSubsys present"
+    xpdstatus
+    if [ $? != 0 ]; then
+      xpdstart
+      Ret=$?
+      if [ $Ret == 0 ]; then
+        logger -t proof-resuscitate 'PROOF was down and restarted successfully'
+        return 0
+      else
+        logger -t proof-resuscitate 'PROOF was down but restart failed'
+        return $Ret
+      fi
+    fi
+    return $?
+  fi
+  echo "Lockfile $LockSubsys is not present"
+  xpdstatus
+  return 0
+}
+
+#
+# Entry point
+#
+
+shift
+
+case "$COMMAND" in
+
+  start)
+    xpdstart
+  ;;
+
+  stop)
+    xpdstop
+  ;;
+
+  status)
+    xpdstatus
+  ;;
+
+  reload|restart)
+    xpdstop
+    xpdstart
+  ;;
+
+  restart-if-down)
+    xpdresuscitate
+  ;;
+
+  *)
+    echo "Usage: $0 {start|stop|status|restart|restart-if-down}"
+  ;;
+
+esac

@@ -1,0 +1,43 @@
+#
+# xrootd.cf -- by Dario Berzano <dario.berzano@cern.ch>
+#
+# Configuration for a simple readonly xrootd server, without cmsd. The idea
+# is to use only the xrootd protocol for file exchange, on top of another
+# JBOD aggregator (like GlusterFS).
+#
+# This file is based on the xrootd.cf.example provided by an xrootd
+# installation.
+#
+# Since many variables are taken from the environment, this configuration only
+# makes sense if xrootd is controlled (started/stopped) by the appropriate AF
+# xrootd control script.
+#
+
+# Convert environment variables to local variables
+set XRDPIDPATH=$XRDPIDPATH
+set XRDSTORAGE=$XRDSTORAGE
+set XRDPROOFDIR=$XRDPROOFDIR
+
+# DEBUG
+export XRDDEBUG="-d"
+
+# Export storage space and var/proof 
+all.export $XRDSTORAGE r/o
+all.export $XRDPROOFDIR r/o
+
+# Role is server; port is the default one
+all.role server
+xrd.port 1094
+
+# Store xrootd.pid in this path
+all.pidpath $XRDPIDPATH
+
+# xrd protocol
+xrd.protocol xrootd * 
+
+# xrootd daemon -- no longer needed! It is builtin!
+#xrootd.fslib $(MyXrootdLibBase)/libXrdOfs.so
+
+# new by SV
+xrd.timeout hail 100 idle 0 read 100 kill 0
+

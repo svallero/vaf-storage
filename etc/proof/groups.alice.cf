@@ -1,0 +1,26 @@
+# Reconstruction
+group ALIREC aliprod, fca
+
+# PWGs
+group PWG0 jgrosseo, mmeoni, yiota, pchrist, snavin, zmatthew, phristov, spochybo, akarasu, mnicassi, jgcn, mvl, wiechula, abilandz, mbombara, delia, canoa, cheshkov, alicecaf, kleinb, lbarnby, dainesea, morsch, scarraza
+group PWG1 belikov, cheshkov, dainesea, shahoian
+group PWG2 jgrosseo, mvala, zmatthew, amaire, bhippoly, belikov, hricaud, yiota, ikraus, rvernet, pchrist, badala, nkolk, snelling, mspyrop, batyunya, pganoti, arcellis, ramello, akisiel, abilandz, mputis, mfragkia, ctagridi, gamaral, dtruesda, mnicassi, mkonno, adash, mkrzewic, bsmilgys, cheshkov, zalitea, amahajan, pulvir, nbockgar, mvassili, lbarnby, mbroz, fblanco, apalaha, ppetrov, zaporozh, jgramlin, jklaudin, lkosarze, majanik, lgraczyk, ddiederi, egkougko, imaldona, seoclara, mfloris, lvalenci, coppedis, filimon, eyyubova, pkalinak, nsharma, plpetrov, ebiolcat, paltieri, mmalayev, zyasin, ptsoumak
+group PWG3 rromita, brunog, arnaldi, pcortese, bbecker, jfaivre, bastid, crilazze, tapiata, loze, ddobrigk, adomingu, mfiguere, cheshkov, mcosenti, dainesea, kwatanab, msano, zampolli, arossi, kread, rbala, laphecet, pdebski, mheinz, dcaffarr, cbianchi, bianchil, gortona, mfasel, cheynis, tieulent, bogdan, dberzano, ppillot, dstocco
+group PWG4 kharlov, policheh, prsnko, asevcenc, schutz, elopez, kleinb, morsch, sjangal, estienne, dfelea, anju, lserkin, dperrino, amastros, arian, idomingu, cuautle, tchujo, goliveir, ydelgado, mkrzewic, bmattost, jklein, canoa, cheshkov, mcosenti, gherrera, aortizve, bbathen, afernan, leslie2, fblanco, aagocs, atoia, guernane, dsilverm, ymao, pscott, esicking, jdubuiss, mfloris, zyin, mverweij, mrwilde
+
+# Detectors
+group EMCAL schutz, mcosenti, kread, mheinz, guernane, dsilverm, bhicks, ymao
+group HMPID lmolnar, leslie2, dibari, fbarile
+group ITS bhippoly, pchrist, snelling, abilandz, mkrzewic, dainesea, arossi, kuijer, bregant, gortona
+group T0 tomatkie, alla
+group MUON pcortese, laphecet, bastid, supriya, dberzano, ppillot, dstocco
+group PHOS schutz, kharlov, policheh, prsnko, ymao, zyin
+group TPC haavard, srossegg, wiechula, akalweit
+group TOF arcellis
+group TRD mkonno, jklein, kwatanab, bbathen, monkim
+group ZDC pcortese, coppedis, gluparel
+group VZERO jgcn, gherrera, lvalenci, cheynis, tieulent
+group ACORDE cuautle, icortesm, mrodrigu
+group PMD adash, pghosh, sjena, nsharma
+
+#include ALICE_PROOF_AAF_PROOF_XPROOFD_DIR/diskquotas.cf 

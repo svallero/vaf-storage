@@ -1,0 +1,3 @@
+srv:  ldap://aliendb06a.cern.ch:8389
+base: ou=People,o=alice,dc=cern,dc=ch
+attr: uid

@@ -1,0 +1,1 @@
+* * * * * sysman "/opt/aaf/bin/af-monalisa.pl" > /dev/null 2> /dev/null

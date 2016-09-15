@@ -1,0 +1,174 @@
+#!/bin/bash
+
+#
+# init.d/xrootd -- by Dario Berzano <dario.berzano@cern.ch>
+#
+# Startup script for xrootd. Environment of AF is loaded automatically, and
+# everything is done as user AF_USER. Some ulimits are set properly as of
+# xrootd requirements.
+#
+
+# For RedHat
+# chkconfig: - 80 30
+# description: xrootd/Scalla file server for AF
+
+#
+# Entry point
+#
+
+# Source environment for AF
+source /etc/aafrc || exit 1
+
+# Create structure
+mkdir -p "$AF_PREFIX"/var/xrootd
+mkdir -p "$AF_PREFIX"/var/log/xrootd
+chown $AF_USER:$AF_GROUP "$AF_PREFIX"/var/xrootd
+chown $AF_USER:$AF_GROUP "$AF_PREFIX"/var/log/xrootd
+
+# Check user!
+if [ `whoami` == 'root' ] ; then
+  #echo "Switching to user $AF_USER..."
+  su $AF_USER -c "$0 $@" 
+  exit $?
+fi
+
+# Source AliEn environment
+source "$AF_PREFIX/etc/env-alice.sh" --alien || exit 1
+
+# Source startup script
+source "$AF_PREFIX"/etc/xrootd/xrootd-startup.cf || exit 1
+
+# Some variables
+export StartScriptOrig="$GSHELL_ROOT"/etc/xrootd/StartXRD
+export StartScriptCopy="$AF_PREFIX"/var/xrootd/StartXRD
+export StopScript="$GSHELL_ROOT"/etc/xrootd/StopXRD
+
+# The pid file
+export PidFile="$XRDPIDPATH"/xrootd.pid
+
+# Query xrootd status. Returns the PID on stdout, or -1 if not running
+function XrdPid() {
+  if [ -r "$PidFile" ] ; then
+    Pid=`cat "$PidFile" 2> /dev/null`
+    kill -0 $Pid 2> /dev/null
+    if [ $? == 0 ] ; then
+      echo "$Pid"
+      return 0
+    fi
+  fi
+  echo "-1"
+  return 1
+}
+
+# xrootd status on stdout
+function XrdStatus() {
+  Pid=`XrdPid`
+  if [ "$Pid" -gt '-1' ] ; then
+    echo "xrootd is running with PID $Pid"
+    return 0
+  else
+    echo "xrootd is not running"
+    return 1
+  fi
+}
+
+# Stop xrootd; we won't use StopXRD, which uses kill -9!!!
+function XrdStop() {
+  echo -n 'Stopping xrootd...'
+
+  Pid=`XrdPid`
+  if [ "$Pid" == '-1' ] ; then
+    echo 'not running'
+    return 0
+  fi
+
+  # Kindly ask...
+  kill -15 $Pid 2> /dev/null
+
+  # ...and check for some time if still running
+  for i in `seq 1 15` ; do
+    Pid=`XrdPid`
+    [ "$Pid" == '-1' ] && break
+    echo -n '.'
+    sleep 1
+  done
+
+  # If still running, kill it
+  Pid=`XrdPid`
+  if [ "$Pid" != '-1' ] ; then
+    kill -9 $Pid 2> /dev/null
+    Aborted=1
+  fi
+
+  # Finally print status
+  if [ `XrdPid` == '-1' ] ; then
+    if [ "$Aborted" == 1 ] ; then
+      echo 'killed abnormally'
+    else
+      echo 'stopped gracefully'
+    fi
+    return 0
+  else
+    echo 'error, still running'
+    return 1
+  fi
+}
+
+# Start xrootd in background
+function XrdStart() {
+  echo -n 'Starting xrootd...'
+  cd "$AF_PREFIX"/var/xrootd
+
+  Pid=`XrdPid` > /dev/null
+  if [ $Pid != -1 ] ; then
+    echo "already running with PID $Pid"
+    return 0
+  fi
+
+  # ulimits for xrootd
+  MaxFd=`ulimit -H -n | grep files | awk '{print $3}'`
+  [ "$MaxFd" == '' ] && MaxFd=`ulimit -H -n`
+  ulimit -c unlimited
+  ulimit -n "$MaxFd" 
+
+  # -b is for background
+  "$GSHELL_ROOT"/bin/xrootd -b \
+    -d \
+    -l "$AF_PREFIX"/var/log/xrootd/xrootd \
+    -c "$AF_PREFIX"/etc/xrootd/xrootd.cf
+  echo 'done, checking status...'
+
+  sleep 5
+  XrdStatus
+  return $?
+
+}
+
+#
+# Entry point
+#
+
+case "$1" in
+
+  start)
+    XrdStart || exit $?
+  ;;
+
+  stop)
+    XrdStop || exit $?
+  ;;
+
+  status)
+    XrdStatus || exit $? 
+  ;;
+
+  reload|restart)
+    XrdStop && XrdStart || exit $?
+  ;;
+
+  *)
+    echo "Usage: $0 {start|stop|status|restart}"
+    exit 1
+  ;;
+
+esac

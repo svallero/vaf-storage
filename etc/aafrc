@@ -1,0 +1,74 @@
+# Directory of AliEn
+#export AF_ALIEN_DIR='/opt/exp_software/alice/alien'
+export AF_ALIEN_DIR='/opt/alicesw/packages/alien'
+
+# Directory of AliEn packages
+#export AF_PACK_DIR='/opt/exp_software/alice/packages'
+export AF_PACK_DIR='/opt/alicesw/packages'
+
+# Extra software (no packages) prefix
+export AF_PREFIX='/opt/aaf'
+
+# AliRoot dependency file and URL
+export AF_DEP_FILE="$AF_PREFIX/etc/aliroot_deps.conf"
+export AF_DEP_URL='http://alienbuild.cern.ch:8889/tarballs/Packages'
+
+# The PROOF master node
+export AF_MASTER='pmaster.to.infn.it'
+
+# Unprivileged administrative user and group
+export AF_USER=sysman
+export AF_GROUP=wheel
+
+# Fraction of cores to assign to workers for each host. It should be the
+# inverse of the number of users you expect to connect simultaneously, i.e.:
+# for 2 users, you'll have 0.5
+export AF_PROOF_WORKERS_PER_CORE=0.6
+
+# ROOT directory of current PROOF version (must be full and explicit, and not
+# necessarily a ROOT coming from Packman
+#export AF_ROOT_PROOF="$AF_PACK_DIR/VO_ALICE/ROOT/v5-33-02b/v5-33-02b"
+export AF_ROOT_PROOF="$AF_PACK_DIR/VO_ALICE/ROOT/v5-34-02-1/v5-34-02-1"
+
+# Directory exported via internal PROOF's Xrootd
+export AF_PROOF_EXPORT="$AF_PREFIX/var/proof/export"
+
+# Datasets directory
+export AF_DATASETS="$AF_PREFIX/var/proof/datasets"
+
+# Destination of the files to be deployed to each machine (with Puppet or
+# whatever you want). It is a rsync destination: it might or may not include
+# a host name
+export AF_DEPLOY_DEST='root@t2-se-00.to.infn.it:/etc/puppet/modules/alice-proof-slave/files/aaf'
+
+# Shared storage prefix (on POSIX filesystem)
+export AF_SHARED_DATA='/storage'
+
+# AliEn user associated to the host certificate of PROOF master
+export AF_ALIEN_USER='proof'
+
+# Custom afdsmgrd (if omitted, use PROOF ROOT's one)
+export AF_CUSTOM_AFDSMGRD='/home/sysman/devel/afdsmgrd/production'
+
+# MonALISA settings
+#export AF_MONA_HOST='193.206.184.58:8884'
+export AF_MONA_HOST='193.206.184.59:8884'
+export AF_MONA_PREFIX='PROOF::TAF::STORAGE'
+
+# Arbitrary status message to show in MonALISA
+export AF_STATUS_MSG='Stable'
+#export AF_STATUS_MSG='Scheduled downtime'
+#export AF_STATUS_MSG='Upgrading'
+
+# Variables for afdsmgrd
+export AF_AFDSMGRD_SLEEPSECS=20
+export AF_AFDSMGRD_SCANDSEVERYLOOPS=15
+export AF_AFDSMGRD_PARALLELXFRS=20
+#export AF_AFDSMGRD_PARALLELXFRS=2
+#export AF_AFDSMGRD_CMDTIMEOUTSECS=1800
+export AF_AFDSMGRD_CMDTIMEOUTSECS=600
+export AF_AFDSMGRD_CORRUPTAFTERFAILS=4
+
+# PROOF memory limits (on RSS and virtual)
+export AF_PROOF_LIMIT_RSS_KB=100000 
+export AF_PROOF_LIMIT_VIRT_KB=100000

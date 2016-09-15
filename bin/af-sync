@@ -1,0 +1,145 @@
+#!/bin/bash
+
+#
+# af-sync -- by Dario Berzano <dario.berzano@cern.ch>
+#
+# Synchronizes AF configuration and/or packages on PROOF nodes.
+#
+
+source /etc/aafrc || exit 1
+
+# Program name
+Prog=`basename "$0"`
+
+# Colored echo on stderr
+function pecho() {
+  local NewLine=''
+  if [ "$1" == -n ]; then
+    NewLine='-n'
+    shift
+  fi
+  echo -e $NewLine "\033[1m$1\033[m" >&2
+}
+
+# Prints help
+function PrintHelp {
+
+  local Prog
+  Prog=`basename "$0"`
+
+  pecho "$Prog -- by Dario Berzano <dario.berzano@cern.ch>"
+  pecho 'Synchronizes AF configuration and/or packages on PROOF nodes.'
+  pecho ''
+  pecho "Usage: $Prog [options] [node1 [node2 [node3...]]]"
+  pecho '      -p,--packages                synchronize PROOF packages only'
+  pecho '      -c,--conf                    synchronize configuration only'
+  pecho '      -a,--all                     synchronize all'
+  pecho '      --help                       this help screen'
+
+}
+
+# Synchronization of packages
+function SyncPackages() {
+  local Fail=''
+  local PackDir="$AF_PREFIX/var/proof/proofbox/$AF_USER/packages"
+  for Node in $Nodes ; do
+    pecho "Syncing PROOF packages on $Node..."
+    ssh $AF_USER@$Node mkdir -p \""$PackDir"\" && rsync -a --delete \
+      "$PackDir"/ $AF_USER@$Node:"$PackDir"/ || Fail="$Fail $Node"
+  done
+  if [ "$Fail" != '' ] ; then
+    pecho "Syncing of packages failed on:$Fail"
+    return 1
+  fi
+}
+
+# Synchronization of configuration
+function SyncConf() {
+  local Fail=''
+
+  for Node in $Nodes ; do
+    pecho "Syncing configuration on $Node..."
+    rsync -a --delete --exclude '**'/var \
+      "$AF_PREFIX"/ $AF_USER@$Node:"$AF_PREFIX"/ && \
+      scp /etc/aafrc $AF_USER@$Node:"$AF_PREFIX"/etc/aafrc || \
+      Fail="$Fail $Node"
+  done
+  if [ "$Fail" != '' ] ; then
+    pecho "Syncing of configuration failed on:$Fail"
+    return 1
+  fi
+}
+
+#
+# Entry point
+#
+
+Prog=$(basename "$0")
+
+Args=$(getopt -o 'pach' --long 'packages,all,conf,help' -n"$Prog" -- "$@")
+[ $? != 0 ] && exit 1
+
+eval set -- "$Args"
+
+while [ "$1" != "--" ] ; do
+
+  case "$1" in
+
+    -p|--packages)
+      SyncPackages=1
+      shift 1
+    ;;
+
+    -a|--all)
+      SyncPackages=1
+      SyncConf=1
+      shift 1
+    ;;
+
+    -c|--conf)
+      SyncConf=1
+      shift 1
+    ;;
+
+    -h|--help)
+      PrintHelp
+      exit 1
+    ;;
+
+    *)
+      # Should never happen
+      pecho "Ignoring unknown option: $1"
+      shift 1
+    ;;
+
+  esac
+
+done
+
+shift # --
+
+if [ "$SyncPackages" == '' ] && [ "$SyncConf" == '' ] ; then
+  PrintHelp
+  exit 1
+fi
+
+#
+# Is list of nodes empty?
+#
+
+export Nodes
+
+if [ $# == 0 ] ; then
+  export Nodes=`cat "$AF_PREFIX"/etc/proof/proof.conf 2> /dev/null | \
+    grep ^worker | awk '{ print $2 }' | sort -u`
+else
+  export Nodes="$*"
+fi
+
+if [ "$SyncPackages" == 1 ] ; then
+  SyncPackages || exit 1
+fi
+
+if [ "$SyncConf" == 1 ] ; then
+  SyncConf || exit 1
+fi
